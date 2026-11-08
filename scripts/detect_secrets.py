@@ -1,12 +1,13 @@
 """Pre-commit secret detection script to prevent accidental credential leakage in public repos.
 
-Scans staged Git diffs for high-risk patterns such as private keys, API tokens,
-and raw cloud credentials before allowing a commit to be created.
+Scans staged Git diffs (or the entire repository when run with --all) for high-risk patterns
+such as private keys, API tokens, and raw cloud credentials.
 """
 
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 # High-risk token and credential patterns
 SECRET_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
@@ -39,7 +40,17 @@ ALLOW_LIST: list[str] = [
     "change-me-in-production",
     "postgres_insecure_default",
     "your_local_postgres_password_here",
+    "your_openai_api_key_here",
+    "your_anthropic_api_key_here",
 ]
+
+# Files excluded from whole-repo scans (e.g. self-referential detector, lockfiles)
+EXCLUDED_SCAN_FILES: set[str] = {
+    "scripts/detect_secrets.py",
+    "scripts\\detect_secrets.py",
+    "uv.lock",
+    ".gitleaks.toml",
+}
 
 
 def is_allowed(line: str) -> bool:
@@ -58,24 +69,18 @@ def get_staged_diff() -> str:
     return result.stdout
 
 
-def scan_staged_diff() -> int:
-    """Scan staged diff lines for forbidden secret patterns."""
-    diff_text = get_staged_diff()
-    if not diff_text.strip():
-        return 0
-
+def scan_diff(diff_text: str) -> list[str]:
+    """Inspect diff additions for forbidden secret patterns."""
     violations: list[str] = []
-
     current_file = "unknown"
+
     for line in diff_text.splitlines():
         if line.startswith("+++ b/"):
             current_file = line[6:]
             continue
 
-        # Only inspect added lines
         if line.startswith("+") and not line.startswith("+++"):
             added_content = line[1:].strip()
-
             if is_allowed(added_content):
                 continue
 
@@ -87,19 +92,71 @@ def scan_staged_diff() -> int:
                         f"    Line: {snippet}..."
                     )
 
+    return violations
+
+
+def scan_all_tracked_files() -> list[str]:
+    """Scan all tracked files in the repository for forbidden patterns."""
+    result = subprocess.run(
+        ["git", "ls-files"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    tracked_files = [f.strip() for f in result.stdout.splitlines() if f.strip()]
+    violations: list[str] = []
+
+    for file_path_str in tracked_files:
+        if file_path_str in EXCLUDED_SCAN_FILES:
+            continue
+
+        file_path = Path(file_path_str)
+        if not file_path.is_file():
+            continue
+
+        try:
+            content = file_path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+
+        for line_num, line in enumerate(content.splitlines(), start=1):
+            if is_allowed(line):
+                continue
+            for pattern_name, pattern in SECRET_PATTERNS:
+                if pattern.search(line):
+                    snippet = line.strip()[:60]
+                    violations.append(
+                        f"  [ERROR] {pattern_name} detected in '{file_path_str}:{line_num}':\n"
+                        f"    Line: {snippet}..."
+                    )
+
+    return violations
+
+
+def main() -> int:
+    """Execute secret detection scan."""
+    scan_all = "--all" in sys.argv or "--ci" in sys.argv
+
+    if scan_all:
+        violations = scan_all_tracked_files()
+    else:
+        diff_text = get_staged_diff()
+        violations = scan_diff(diff_text)
+
     if violations:
         print("\n" + "=" * 78, file=sys.stderr)
-        print(" [SECURITY ALERT] PRE-COMMIT BLOCKED A POTENTIAL SECRET LEAK!", file=sys.stderr)
+        print(" [SECURITY ALERT] SECRET DETECTION CHECK FAILED!", file=sys.stderr)
         print("=" * 78, file=sys.stderr)
         for violation in violations:
             print(violation, file=sys.stderr)
-        print("\nCommit aborted to protect your public repository.", file=sys.stderr)
+        print("\nAborted to protect your public repository.", file=sys.stderr)
         print("Check ALLOW_LIST in scripts/detect_secrets.py if false positive.", file=sys.stderr)
         print("=" * 78 + "\n", file=sys.stderr)
         return 1
 
+    print("Secret scan passed: zero credentials or private keys detected.")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(scan_staged_diff())
+    sys.exit(main())

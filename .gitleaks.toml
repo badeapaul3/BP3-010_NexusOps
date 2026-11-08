@@ -1,0 +1,19 @@
+# Gitleaks Configuration & Whitelist Policy
+[allowlist]
+description = "Global allowlist for documentation, tests, and configuration templates"
+paths = [
+    '''^\.env\.example$''',
+    '''^setup_info\.md$''',
+    '''^README\.md$''',
+    '''^ROADMAP\.md$''',
+    '''^scripts/detect_secrets\.py$''',
+    '''^tests/.*''',
+]
+stopwords = [
+    "postgres_insecure_default",
+    "change-me-in-production-super-secret-key-32b",
+    "change-me-in-local-dev-mock-secret-key-64-characters-long-example",
+    "your_local_postgres_password_here",
+    "your_openai_api_key_here",
+    "your_anthropic_api_key_here",
+]
