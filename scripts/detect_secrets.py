@@ -10,15 +10,25 @@ import sys
 
 # High-risk token and credential patterns
 SECRET_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("Private Key Header", re.compile(r"-----BEGIN\s+(?:RSA|OPENSSH|EC|DSA|PGP|PRIVATE)\s+KEY-----")),
+    (
+        "Private Key Header",
+        re.compile(r"-----BEGIN\s+(?:RSA|OPENSSH|EC|DSA|PGP|PRIVATE)\s+KEY-----"),
+    ),
     ("OpenAI API Key", re.compile(r"sk-[a-zA-Z0-9]{20,}")),
     ("Anthropic API Key", re.compile(r"sk-ant-[a-zA-Z0-9_-]{20,}")),
-    ("AWS Access Key ID", re.compile(r"(?:A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}")),
+    (
+        "AWS Access Key ID",
+        re.compile(r"(?:A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}"),
+    ),
     ("GitHub Personal Access Token", re.compile(r"gh[pousr]_[A-Za-z0-9_]{36,}")),
     ("Slack API Token", re.compile(r"xox[baprs]-[0-9a-zA-Z]{10,48}")),
-    ("Generic High-Entropy Secret Assignment", re.compile(
-        r'(?i)(?:api_key|api_secret|aws_secret_access_key|access_token|private_key|auth_token)\s*=\s*["\'][a-zA-Z0-9_\-+/]{20,}["\']'
-    )),
+    (
+        "Generic High-Entropy Secret Assignment",
+        re.compile(
+            r"(?i)(?:api_key|api_secret|aws_secret_access_key|access_token|private_key|auth_token)"
+            r'\s*=\s*["\'][a-zA-Z0-9_\-+/]{20,}["\']'
+        ),
+    ),
 ]
 
 # Allow-listed patterns (e.g., explicit example/placeholder tokens)
@@ -71,18 +81,20 @@ def scan_staged_diff() -> int:
 
             for pattern_name, pattern in SECRET_PATTERNS:
                 if pattern.search(added_content):
+                    snippet = added_content[:60]
                     violations.append(
-                        f"  [ERROR] {pattern_name} detected in '{current_file}':\n    Line: {added_content[:80]}..."
+                        f"  [ERROR] {pattern_name} detected in '{current_file}':\n"
+                        f"    Line: {snippet}..."
                     )
 
     if violations:
         print("\n" + "=" * 78, file=sys.stderr)
-        print(" [SECURITY ALERT] PRE-COMMIT CHECK BLOCKED A POTENTIAL SECRET LEAK!", file=sys.stderr)
+        print(" [SECURITY ALERT] PRE-COMMIT BLOCKED A POTENTIAL SECRET LEAK!", file=sys.stderr)
         print("=" * 78, file=sys.stderr)
         for violation in violations:
             print(violation, file=sys.stderr)
         print("\nCommit aborted to protect your public repository.", file=sys.stderr)
-        print("If this is a false positive, verify the token is a mock value in ALLOW_LIST.", file=sys.stderr)
+        print("Check ALLOW_LIST in scripts/detect_secrets.py if false positive.", file=sys.stderr)
         print("=" * 78 + "\n", file=sys.stderr)
         return 1
 
