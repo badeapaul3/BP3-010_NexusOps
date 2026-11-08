@@ -57,13 +57,46 @@ Instead of creating fragmented, isolated toy projects for each concept, the plat
 
 ---
 
-## 4. Environment & Toolchain Provisioning
+## 4. Public Repository Security Controls & Credential Shielding
+
+> **What it means:** Concentric layers of automated defense preventing secret and credential leaks in a public GitHub repository.  
+> **What it does:** Automatically detects and blocks API keys, private keys, passwords, and cloud credentials before they ever reach GitHub.  
+> **How it works:** Combines aggressive `.gitignore` blocking, a local Python pre-commit hook, CI secret scanning via Gitleaks, Pydantic `SecretStr` masking, and `.env.example` templating.
+
+### 4.1 Strict Git Ignore Rules (`.gitignore`)
+> **What it means:** Blacklisting sensitive file extensions and paths from Git tracking.  
+> **What it does:** Prevents local `.env`, cloud tokens (`.aws/`, `.gcp/`), SSH keys (`*.pem`, `id_rsa`), certificates (`*.key`), and Terraform state (`*.tfstate`) from being staged.  
+> **How it works:** Defined in `.gitignore` with explicit wildcard blocking and positive exemption only for safe templates (`!.env.example`).
+
+### 4.2 Local Pre-Commit Secret Scanner (`scripts/detect_secrets.py`)
+> **What it means:** A client-side Git pre-commit hook that inspects staged code diffs before allowing a commit.  
+> **What it does:** Blocks commits and prints security alerts if high-risk patterns (OpenAI/Anthropic keys, AWS credentials, private keys) are staged.  
+> **How it works:** Wired into `.git/hooks/pre-commit` to execute regex pattern matching against `git diff --staged` with allow-listed mock tokens.
+
+### 4.3 Automated CI Secret Scanning (`.github/workflows/security-scan.yml`)
+> **What it means:** Cloud-side automated secret detection running on GitHub infrastructure.  
+> **What it does:** Scans every push and pull request with Gitleaks to guarantee no secret bypasses local hooks.  
+> **How it works:** GitHub Actions workflow executing `gitleaks-action@v2` across full git commit history.
+
+### 4.4 In-Memory Secret Shielding (`src/cloud_platform/core/config.py`)
+> **What it means:** Application-level masking of sensitive credentials in memory and logs.  
+> **What it does:** Prevents passwords and secret keys from leaking into log aggregators, stack traces, or console outputs.  
+> **How it works:** Wraps sensitive attributes in `pydantic.SecretStr`, ensuring `str(secret)` renders `**********` while requiring `.get_secret_value()` for authorized usage.
+
+### 4.5 Formal Security Policy (`SECURITY.md`)
+> **What it means:** The open-source security guidelines and disclosure policy for the repository.  
+> **What it does:** Informs contributors of zero-hardcoded secret requirements and private vulnerability disclosure procedures.  
+> **How it works:** Public markdown policy hosted at the repository root.
+
+---
+
+## 5. Environment & Toolchain Provisioning
 
 > **What it means:** The underlying runtime binaries and package management tooling powering the project.  
 > **What it does:** Provides an isolated, reproducible development environment capable of sub-second dependency resolution and execution.  
 > **How it works:** Installs Astral `uv`, downloads an isolated CPython 3.12.16 binary, and manages an isolated virtual environment (`.venv`).
 
-### 4.1 Tooling Installation (Astral uv)
+### 5.1 Tooling Installation (Astral uv)
 > **What it means:** A next-generation Python package and project manager written in Rust.  
 > **What it does:** Replaces legacy `pip`, `pip-tools`, `virtualenv`, and `poetry` with 10–100x faster operations.  
 > **How it works:** Uses a global content-addressable cache, parallel HTTP downloads, and PubGrub dependency resolution algorithms.
@@ -71,7 +104,7 @@ Instead of creating fragmented, isolated toy projects for each concept, the plat
 - Installed at `C:\Users\badea\.local\bin\uv.exe` (v0.13.7).
 - Resolves dependencies 10–100x faster than traditional tools, provides cross-platform universal locking, and manages isolated Python versions.
 
-### 4.2 Hermetic Python Runtime (CPython 3.12.16)
+### 5.2 Hermetic Python Runtime (CPython 3.12.16)
 > **What it means:** A self-contained, standalone Python interpreter decoupled from host OS installations.  
 > **What it does:** Guarantees uniform execution across all developer machines and CI/CD pipelines without environment drift.  
 > **How it works:** Downloaded directly into user data directories via `uv python install 3.12` and linked into `.venv`.
@@ -79,7 +112,7 @@ Instead of creating fragmented, isolated toy projects for each concept, the plat
 - Downloaded and managed automatically via `uv python install 3.12`.
 - Ensures consistent runtime behavior without polluting system environment paths.
 
-### 4.3 Virtual Environment (.venv)
+### 5.3 Virtual Environment (.venv)
 > **What it means:** An isolated directory holding project-specific site-packages and executable scripts.  
 > **What it does:** Prevents library version collisions with other applications on the operating system.  
 > **How it works:** Created via `uv venv` and populated in milliseconds with exact package versions via `uv sync`.
@@ -89,7 +122,7 @@ Instead of creating fragmented, isolated toy projects for each concept, the plat
 
 ---
 
-## 5. Packaging & Quality Configuration (`pyproject.toml`)
+## 6. Packaging & Quality Configuration (`pyproject.toml`)
 
 > **What it means:** The standardized single source of truth for build metadata, dependencies, and tool settings.  
 > **What it does:** Controls build backends, linter rules, strict type-checking flags, and test execution parameters.  
@@ -107,13 +140,13 @@ The root [`pyproject.toml`](./pyproject.toml) is strictly aligned with modern PE
 
 ---
 
-## 6. Architectural Foundations Implemented (Milestone 01)
+## 7. Architectural Foundations Implemented (Milestone 01)
 
 > **What it means:** The fundamental software primitives providing configuration, typing contracts, and domain models.  
 > **What it does:** Establishes compile-time type verification, settings parsing, and immutable business logic for *NexusOps*.  
 > **How it works:** Implements Pydantic v2 BaseSettings, typing.Protocol interfaces, ParamSpec decorators, and validated domain entities.
 
-### 6.1 Configuration Management (`src/cloud_platform/core/config.py`)
+### 7.1 Configuration Management (`src/cloud_platform/core/config.py`)
 > **What it means:** 12-Factor application configuration and secret management.  
 > **What it does:** Loads, validates, and exposes environment variables, database connection strings, and security credentials.  
 > **How it works:** Uses `pydantic-settings.BaseSettings`, masks credentials with `SecretStr`, and dynamically builds `asyncpg` DSNs.
@@ -124,7 +157,7 @@ The root [`pyproject.toml`](./pyproject.toml) is strictly aligned with modern PE
 - **Environment Normalization:** Custom `@field_validator(mode="before")` normalizes string tiers (`"PRODUCTION"` -> `Environment.PRODUCTION`).
 - **Singleton Accessor:** `@lru_cache(maxsize=1)` guarantees safe, thread-safe access to settings without re-reading the filesystem.
 
-### 6.2 Structural Protocols (`src/cloud_platform/core/protocols.py`)
+### 7.2 Structural Protocols (`src/cloud_platform/core/protocols.py`)
 > **What it means:** Duck-typed interface definitions following Clean Architecture Port-and-Adapter principles.  
 > **What it does:** Decouples domain logic from concrete database adapters and third-party message brokers.  
 > **How it works:** Uses `typing.Protocol` with `@runtime_checkable` so classes conform based on shape rather than inheritance.
@@ -137,7 +170,7 @@ The root [`pyproject.toml`](./pyproject.toml) is strictly aligned with modern PE
   - `Repository[T]`: Generic async persistence port (`get_by_id`, `list_all`, `add`, `delete`).
   - `EventPublisher[T]`: Generic async message broker port for Redis/SNS/PubSub.
 
-### 6.3 Type-Safe Decorators (`src/cloud_platform/core/decorators.py`)
+### 7.3 Type-Safe Decorators (`src/cloud_platform/core/decorators.py`)
 > **What it means:** Higher-order function wrappers that preserve complete static type metadata.  
 > **What it does:** Measures execution latency and executes exponential backoff retries without erasing argument or return types.  
 > **How it works:** Utilizes Python 3.12 `ParamSpec` (`P`) and `TypeVar` (`R`) to mirror decorated function signatures for Mypy.
@@ -147,7 +180,7 @@ The root [`pyproject.toml`](./pyproject.toml) is strictly aligned with modern PE
   - `@log_execution_time`: Measures and logs execution latency in milliseconds without mutating function contracts.
   - `@retry_with_backoff`: Async exponential backoff decorator for transient network failures.
 
-### 6.4 Domain Models & Validation (`src/cloud_platform/domain/models.py`)
+### 7.4 Domain Models & Validation (`src/cloud_platform/domain/models.py`)
 > **What it means:** Core business entities (`Tenant`, `Workload`, `AuditEntry`) and their validation invariants.  
 > **What it does:** Rejects invalid cloud states, sanitizes tenant slugs, and enforces minimum CPU allocations for critical jobs.  
 > **How it works:** Leverages Pydantic v2's Rust-backed engine with `@field_validator`, `@model_validator`, and frozen value objects.
@@ -162,7 +195,7 @@ The root [`pyproject.toml`](./pyproject.toml) is strictly aligned with modern PE
 
 ---
 
-## 7. Comprehensive Test Suite
+## 8. Comprehensive Test Suite
 
 > **What it means:** Automated unit tests verifying domain rules, configuration logic, and structural protocols in memory.  
 > **What it does:** Catches regressions instantly in sub-second test runs before code reaches integration or production.  
@@ -180,7 +213,7 @@ Located under [`tests/unit/`](./tests/unit/):
 
 ---
 
-## 8. Master Planning & Documentation Index
+## 9. Master Planning & Documentation Index
 
 > **What it means:** The complete roadmap and progressive milestone specifications for the 10 modules.  
 > **What it does:** Provides the long-term blueprint and architectural specifications for every layer of the system.  
@@ -191,6 +224,7 @@ The repository contains complete documentation of the 10 progressive milestones:
 - **[ROADMAP.md](./ROADMAP.md):** The comprehensive architectural blueprint and curriculum progress tracker.
 - **[README.md](./README.md):** The unified codebase entrypoint and toolchain guide.
 - **[LEARNING_GUIDELINES.md](./docs/LEARNING_GUIDELINES.md):** The pair-programming pedagogical contract.
+- **[SECURITY.md](./SECURITY.md):** Public repository zero-hardcoded secrets policy.
 - **[docs/modules/](./docs/modules/):** Detailed architectural specifications for all 10 stages:
   - `01_tooling_typing_pydantic.md`: Modern Tooling, Packaging, Typing & Pydantic v2
   - `02_asyncio_concurrency_resilience.md`: Advanced Asyncio, Concurrency & Resilience
@@ -205,7 +239,7 @@ The repository contains complete documentation of the 10 progressive milestones:
 
 ---
 
-## 9. Toolchain Verification Commands
+## 10. Toolchain Verification Commands
 
 > **What it means:** The essential CLI commands used to audit, lint, typecheck, and test the repository.  
 > **What it does:** Gives engineers a reproducible workflow to ensure the repository remains in a 100% green state.  
