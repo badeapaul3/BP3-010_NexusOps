@@ -75,8 +75,8 @@ Instead of creating fragmented, isolated toy projects for each concept, the plat
 
 ### 4.3 Automated CI Secret Scanning (`.github/workflows/security-scan.yml`)
 > **What it means:** Cloud-side automated secret detection running on GitHub infrastructure.  
-> **What it does:** Scans every push and pull request with Gitleaks to guarantee no secret bypasses local hooks.  
-> **How it works:** GitHub Actions workflow executing `gitleaks-action@v2` across full git commit history.
+> **What it does:** Scans every push and pull request with native regex scanners and TruffleHog to guarantee no secret bypasses local hooks.  
+> **How it works:** GitHub Actions workflow executing `scripts/detect_secrets.py --all` and `trufflesecurity/trufflehog@main` container across full git commit history.
 
 ### 4.4 In-Memory Secret Shielding (`src/cloud_platform/core/config.py`)
 > **What it means:** Application-level masking of sensitive credentials in memory and logs.  

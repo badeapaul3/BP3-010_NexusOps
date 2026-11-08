@@ -20,7 +20,7 @@ The repository incorporates multiple concentric layers of defense to prevent cre
 3. **Local Pre-Commit Hook ([`scripts/detect_secrets.py`](./scripts/detect_secrets.py)):**
    - Automatically scans staged Git diffs before every commit. Blocks commits containing private keys, AWS tokens, OpenAI/Anthropic keys, or high-entropy secrets.
 4. **Automated CI Scanning ([`.github/workflows/security-scan.yml`](./.github/workflows/security-scan.yml)):**
-   - GitHub Actions executes Gitleaks on every push and pull request with full history scanning.
+   - GitHub Actions executes our zero-dependency native secret scanner and TruffleHog container verification on every push and pull request with full history scanning.
 
 ---
 
