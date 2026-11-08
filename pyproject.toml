@@ -1,0 +1,94 @@
+[build-system]
+requires = ["hatchling>=1.21.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "enterprise-cloud-platform"
+version = "0.1.0"
+description = "Production-grade cloud-native Python platform demonstrating modern typing, FastAPI, AI agents, and SRE"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+    { name = "Cloud Architecture Team", email = "architecture@enterprise.internal" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+    "Operating System :: OS Independent",
+    "Framework :: FastAPI",
+    "Framework :: Pydantic :: 2",
+]
+dependencies = [
+    "pydantic>=2.7.0,<3.0.0",
+    "pydantic-settings>=2.2.0,<3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.4.4",
+    "mypy>=1.10.0",
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.6",
+    "pytest-mock>=3.14.0",
+    "hypothesis>=6.102.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cloud_platform"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade (modern 3.12+ syntax)
+    "ARG",    # flake8-unused-arguments
+    "PTH",    # flake8-use-pathlib
+    "RUF",    # Ruff-specific rules
+]
+ignore = [
+    "RUF009", # Do not perform function call in dataclass defaults (when intentional)
+    "UP047",  # Allow standard TypeVar/ParamSpec annotations alongside PEP 695
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["cloud_platform"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src", "tests"]
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_any_generics = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+plugins = ["pydantic.mypy"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    "error",
+]
